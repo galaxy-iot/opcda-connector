@@ -1,5 +1,8 @@
 ﻿#pragma once
 
+#ifndef OPCDA_CLIENT_H
+#define OPCDA_CLIENT_H
+
 #include <COMCat.h>
 #include <atlbase.h>
 #include <atlcoll.h>
@@ -17,6 +20,8 @@
 #include "opc_enum.h"
 #include "opcda.h"
 #include "opcda_item.h"
+#include "opcda_async.h"
+#include "encoding.h"
 
 class OPCDAClient
 {
@@ -30,7 +35,12 @@ private:
     ATL::CComPtr<IOPCServer> iOpcServer;
     ATL::CComPtr<IUnknown> iUnknown;
 
-    std::unordered_map<std::wstring, OPCDAItem> itemMap;
+    std::unordered_map<std::string, OPCDAItem> itemMap;
+
+    ATL::CComPtr<CAsyncDataCallback> AsyncDataCallBackHandler;
+    ATL::CComPtr<IConnectionPoint> iAsyncDataCallbackConnectionPoint;
+
+    DWORD GroupCallbackHandle;
 public:
     OPCDAClient();
     ~OPCDAClient();
@@ -39,9 +49,18 @@ public:
     int newGroup(const std::wstring &groupName,bool active, unsigned long reqUpdateRate_ms,
         unsigned long& revisedUpdateRate_ms, float deadBand);
 
-    int addItem(std::wstring itemName, bool active);
-    int addItems(std::vector<std::wstring> &itemNames, bool active);
+    int addItem(std::string itemName, bool active);
+    int addItems(std::vector<std::string> &itemNames, bool active);
+    int removeItem(std::string itemName);
 
-    int readItem(std::wstring itemName);
-    int getItemValue(std::wstring itemName);
+    int readItem(std::string itemName);
+    void printValues();
+
+    int enableAsync();
+    int refresh();
+
+    std::unordered_map<std::string, OPCDAItem>& getDataMap(); 
+    static std::string VariantToString(VARTYPE type, VARIANT data);
 }; 
+
+#endif

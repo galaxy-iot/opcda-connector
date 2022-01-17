@@ -1,4 +1,6 @@
 #include <iostream>
+#include <windows.h>
+
 #include "opcda_client.h"
 
 int main() {
@@ -22,23 +24,28 @@ int main() {
 
 	std::cout << "create group successfully" << std::endl;
 
-	std::vector<std::wstring> v;
-	v.push_back(L"aaa.aaa");
-	v.push_back(L"aaa.aaa1aaa");
 
-	ret = d.addItems(v,true);
+	ret = d.addItem("aaa.aaa", true);
 	if (ret < 0) {
 		std::cout << "add items failed" << std::endl;
 		exit(-1);
 	}
+	d.addItem("aaa.aaa1", true);
+	d.addItem("aaa.aaa2", true);
 
-	ret = d.readItem(L"aaa.aaa");
+	ret = d.enableAsync();
 	if (ret < 0) {
-		std::cout << "read item failed" << std::endl;
+		std::cout << "enable async failed" << std::endl;
 		exit(-1);
 	}
 
-	d.getItemValue(L"aaa.aaa");
+	std::cout << "enable async successfully" << std::endl;
+
+	while (true) {
+		d.refresh();
+		Sleep(1000);
+		d.printValues();
+	}
 
 	return 0;
 }

@@ -3,7 +3,6 @@
 
 #include "opcda_client.h"
 
-
 OPCDAClient::OPCDAClient() {
     HRESULT result = CoInitialize(nullptr);
     if (FAILED(result))
@@ -22,6 +21,8 @@ OPCDAClient::~OPCDAClient() {
     iSyncIO = nullptr;
     iAsync2IO = nullptr;
     iItemManagement = nullptr;
+    AsyncDataCallBackHandler = nullptr;
+    iAsyncDataCallbackConnectionPoint = nullptr;
 
     printf("%s\n","dconstruct");
     CoUninitialize();
@@ -103,6 +104,9 @@ HRESULT getListOfDAServersEx(std::wstring hostName, tagCLSCTX serverLocation, CA
             {
                 return ret;
             }
+
+            CoTaskMemFree(progID);
+            CoTaskMemFree(userType);
         } // else
     }     // while
 
@@ -187,55 +191,68 @@ int OPCDAClient::newGroup(const std::wstring& groupName, bool active, unsigned l
     return 0;
 }
 
-int OPCDAClient::addItem(std::wstring itemName,bool active) {
-    std::vector<std::wstring> v;
-    v.push_back(itemName);
-
-    return this->addItems(v,active);
-}
-
-int OPCDAClient::addItems(std::vector<std::wstring>& itemNames, bool active) {
-    OPCITEMDEF* m_Items = new OPCITEMDEF[itemNames.size()];
-
-    for (int i = 0; i < itemNames.size(); i++) {
-        if (this->itemMap.find(itemNames[i]) == this->itemMap.end()) {
-            itemMap.insert(std::pair<std::wstring, OPCDAItem>(itemNames[i], OPCDAItem(itemNames[i])));
-        }
-
-        m_Items[i].szItemID = (wchar_t*)(itemNames[i].c_str());
-        m_Items[i].bActive = active;
-        m_Items[i].hClient = (OPCHANDLE) & (itemMap[itemNames[i]]);
-        m_Items[i].dwBlobSize = 0;
-        m_Items[i].pBlob = nullptr;
-        m_Items[i].vtRequestedDataType = VT_EMPTY;
-        m_Items[i].szAccessPath = L"";
+int OPCDAClient::removeItem(std::string itemName) {
+    if (this->itemMap.find(itemName) == this->itemMap.end()) {
+        return 0;
     }
-
+    
+    OPCHANDLE handlers[1];
+    handlers[0] = itemMap[itemName].getServerItemHandle();
     HRESULT* results = nullptr;
-    OPCITEMRESULT* details = nullptr;
 
-    HRESULT result = iItemManagement->AddItems(itemNames.size(), m_Items, &details, &results);
-    delete(m_Items);
+    HRESULT result = iItemManagement->RemoveItems(1, handlers,&results);
     if (FAILED(result)) {
         return -1;
     }
 
-    for (int i = 0; i < itemNames.size(); i++) {
-        if (details[i].pBlob)
-        {
-            CoTaskMemFree(details[i].pBlob);
-        }
+    if (FAILED(results[0])) {
+        return -1;
+    }
 
-        if (FAILED(results[i])) {
-            std::wcout << "item " << itemNames[i] << " is invalid" << std::endl;
-            this->itemMap[itemNames[i]].setValid(false);
-        }
-        else {
-            std::wcout << "item " << itemNames[i] << " is valid" << std::endl;
-            this->itemMap[itemNames[i]].setValid(true);
-            this->itemMap[itemNames[i]].setDataType(details[i].vtCanonicalDataType);
-            this->itemMap[itemNames[i]].setServerItemHandle(details[i].hServer);
-        }
+    CoTaskMemFree(results);
+    return 0;
+}
+
+int OPCDAClient::addItem(std::string itemName,bool active) {
+    OPCITEMDEF m_Items[1];
+
+    if (this->itemMap.find(itemName) == this->itemMap.end()) {
+        std::cout << itemName << " not exist" << std::endl;
+        itemMap.insert(std::pair<std::string, OPCDAItem>(itemName, OPCDAItem(itemName)));
+    }
+    else {
+        std::cout << removeItem(itemName) << std::endl;
+    }
+
+    m_Items[0].szItemID = (wchar_t*)(S2WS(itemName).c_str());
+    m_Items[0].bActive = active;
+    m_Items[0].hClient = (OPCHANDLE) & (itemMap[itemName]);
+    m_Items[0].dwBlobSize = 0;
+    m_Items[0].pBlob = nullptr;
+    m_Items[0].vtRequestedDataType = VT_EMPTY;
+    m_Items[0].szAccessPath = L"";
+
+    HRESULT* results = nullptr;
+    OPCITEMRESULT* details = nullptr;
+
+    HRESULT result = iItemManagement->AddItems(1, m_Items, &details, &results);
+    if (FAILED(result)) {
+        this->itemMap[itemName].setValid(false);
+        return 0;
+    }
+
+    if (details[0].pBlob)
+    {
+        CoTaskMemFree(details[0].pBlob);
+    }
+
+    if (FAILED(results[0])) {
+        this->itemMap[itemName].setValid(false);
+    }
+    else {
+        this->itemMap[itemName].setValid(true);
+        this->itemMap[itemName].setDataType(details[0].vtCanonicalDataType);
+        this->itemMap[itemName].setServerItemHandle(details[0].hServer);
     }
 
     CoTaskMemFree(details);
@@ -244,7 +261,15 @@ int OPCDAClient::addItems(std::vector<std::wstring>& itemNames, bool active) {
     return 0;
 }
 
-int OPCDAClient::readItem(std::wstring itemName) {
+int OPCDAClient::addItems(std::vector<std::string>& itemNames, bool active) {
+    for (int i = 0; i < itemNames.size(); i++) {
+        addItem(itemNames[i],active);
+    }
+
+    return 0;
+}
+
+int OPCDAClient::readItem(std::string itemName) {
     if (this->itemMap.find(itemName) == this->itemMap.end()) {
         return -1;
     }
@@ -255,7 +280,7 @@ int OPCDAClient::readItem(std::wstring itemName) {
 
     phServer[0] = itemMap[itemName].getServerItemHandle();
     
-    HRESULT ret = iSyncIO->Read(OPC_DS_CACHE, 1, phServer, &pItemValue, &pErrors);
+    HRESULT ret = iSyncIO->Read(OPC_DS_DEVICE, 1, phServer, &pItemValue, &pErrors);
     if (FAILED(ret)) {
         return -1;
     }
@@ -269,11 +294,165 @@ int OPCDAClient::readItem(std::wstring itemName) {
     return 0;
 }
 
-int OPCDAClient::getItemValue(std::wstring itemName) {
-    if (this->itemMap.find(itemName) == this->itemMap.end()) {
-        std::wcout << "item " << itemName << " is not in group" << std::endl;
+int OPCDAClient::enableAsync() {
+    ATL::CComPtr<IConnectionPointContainer> iConnectionPointContainer = 0;
+    HRESULT result =
+        iStateManagement->QueryInterface(IID_IConnectionPointContainer, (void**)&iConnectionPointContainer);
+    if (FAILED(result))
+    {
         return -1;
     }
 
-    std::cout << itemMap[itemName].getDataType() << std::endl;
+    result = iConnectionPointContainer->FindConnectionPoint(IID_IOPCDataCallback, &iAsyncDataCallbackConnectionPoint);
+    if (FAILED(result))
+    {
+        return -1;
+    }
+
+    AsyncDataCallBackHandler = new CAsyncDataCallback();
+    result = iAsyncDataCallbackConnectionPoint->Advise(AsyncDataCallBackHandler, &GroupCallbackHandle);
+    if (FAILED(result))
+    {
+        iAsyncDataCallbackConnectionPoint = nullptr;
+        AsyncDataCallBackHandler = nullptr;
+        return -1;
+    }
+
+    return 0;
+}
+
+int OPCDAClient::refresh() {
+    DWORD cancelID = 0;
+
+    HRESULT result = iAsync2IO->Refresh2(OPC_DS_DEVICE, 1, &cancelID);
+    if (FAILED(result))
+    {
+        return 1;
+    } // if
+    return 0;
+}
+
+std::unordered_map<std::string, OPCDAItem>& OPCDAClient::getDataMap() {
+    return this->itemMap;
+}
+
+void OPCDAClient::printValues() {
+    for (auto iter = itemMap.begin(); iter != itemMap.end(); iter++)
+    {
+        std::cout << "item:" << iter->first << " ok:" << iter->second.getValid() << ", value:" <<
+            VariantToString(iter->second.getDataType(),iter->second.getValue()) << std::endl;
+    }
+}
+
+std::string OPCDAClient::VariantToString(VARTYPE type,VARIANT data)
+{
+    std::string strValue;
+    TCHAR szValue[1024] = { 0x00 };
+
+    switch (type)
+    {
+    case VT_BSTR:
+    case VT_LPSTR:
+    case VT_LPWSTR:
+        strValue = (LPCTSTR)data.bstrVal;
+        break;
+
+    case VT_I1:
+    case VT_UI1:
+        sprintf_s(szValue, _T("%d"), data.bVal);
+        strValue = szValue;
+        break;
+
+    case VT_I2:
+        sprintf_s(szValue, _T("%d"), data.iVal);
+        strValue = szValue;
+        break;
+
+    case VT_UI2:
+        sprintf_s(szValue, _T("%d"), data.uiVal);
+        strValue = szValue;
+        break;
+
+    case VT_INT:
+        sprintf_s(szValue, _T("%d"), data.intVal);
+        strValue = szValue;
+        break;
+
+    case VT_I4:
+        sprintf_s(szValue, _T("%d"), data.lVal);
+        strValue = szValue;
+        break;
+
+    case VT_I8:
+        sprintf_s(szValue, _T("%ld"), data.bVal);
+        strValue = szValue;
+        break;
+
+    case VT_UINT:
+        sprintf_s(szValue, _T("%u"), data.uintVal);
+        strValue = szValue;
+        break;
+
+    case VT_UI4:
+        sprintf_s(szValue, _T("%u"), data.ulVal);
+        strValue = szValue;
+        break;
+
+    case VT_UI8:
+        sprintf_s(szValue, _T("%u"), data.ulVal);
+        strValue = szValue;
+        break;
+
+    case VT_VOID:
+        sprintf_s(szValue, _T("%8x"), (unsigned int)data.byref);
+        strValue = szValue;
+        break;
+
+    case VT_R4:
+        sprintf_s(szValue, _T("%.4f"), data.fltVal);
+        strValue = szValue;
+        break;
+
+    case VT_R8:
+        sprintf_s(szValue, _T("%.8f"), data.dblVal);
+        strValue = szValue;
+        break;
+
+    case VT_DECIMAL:
+        sprintf_s(szValue, _T("%.4f"), data.decVal);
+        strValue = szValue;
+        break;
+
+    case VT_CY:
+        //COleCurrency cy = data.vDataValue.cyVal;
+        //strValue = cy.Format();
+        break;
+
+    case VT_BOOL:
+        strValue = data.boolVal ? "TRUE" : "FALSE";
+        break;
+
+    case VT_DATE: {
+        DATE dt = data.date;
+        // COleDateTime da = COleDateTime(dt);
+        // strValue = da.Format("%Y-%m-%d %H:%M:%S");
+        break;
+    }
+
+
+    case VT_NULL:
+        strValue = "VT_NULL";
+        break;
+
+    case VT_EMPTY:
+        strValue = "";
+        break;
+
+    case VT_UNKNOWN:
+    default:
+        strValue = "UN_KNOWN";
+        break;
+    }
+
+    return strValue;
 }

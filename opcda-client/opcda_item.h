@@ -1,5 +1,5 @@
 #ifndef OPCDA_ITEM_H
-#define OPCDA_ITEM
+#define OPCDA_ITEM_H
 
 #include <COMCat.h>
 #include <atlbase.h>
@@ -14,11 +14,11 @@ private:
     bool valid;
     VARIANT value;
     WORD quality;
-    std::wstring ItemName;
+    std::string ItemName;
 
 public:
     OPCDAItem();
-    OPCDAItem(std::wstring ItemName);
+    OPCDAItem(std::string ItemName);
 
     void setValid(bool valid);
     void setDataType(VARTYPE type);

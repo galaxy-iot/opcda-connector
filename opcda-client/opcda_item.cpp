@@ -1,6 +1,6 @@
 #include "opcda_item.h"
 
-OPCDAItem::OPCDAItem(std::wstring ItemName) : ItemName(ItemName) {}
+OPCDAItem::OPCDAItem(std::string ItemName) : ItemName(ItemName) {}
 
 OPCDAItem::~OPCDAItem() {}
 
