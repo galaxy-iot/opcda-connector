@@ -40,10 +40,12 @@ add_executable(opcda-driver
 )
 
 target_link_libraries(opcda-driver ws2_32)
+target_link_libraries(opcda-driver comsuppw)
 target_link_libraries(opcda-driver opcda-client)
 
 add_executable(demo 
 	"opcda-client/demo.cpp"
 )
 
+target_link_libraries(demo comsuppw)
 target_link_libraries(demo opcda-client)

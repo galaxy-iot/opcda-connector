@@ -49,8 +49,6 @@ STDMETHODIMP CAsyncDataCallback::OnDataChange(DWORD transactionID, OPCHANDLE gro
     DWORD count, OPCHANDLE* clientHandles, VARIANT* values, WORD* quality, FILETIME* time,
     HRESULT* errors)
 {
-    std::cout << "data changed:" << count << std::endl;
-
     OPCDAItem* item;
     for (int i = 0; i < count; i++) {
         item = (OPCDAItem*)clientHandles[i];

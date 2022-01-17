@@ -3,7 +3,7 @@
 int readN(int fd, char *buf,int length) {
 	while (length > 0) {
 		char ch;
-		if (recv(fd, &ch, 1, 0) < 0) {
+		if (recv(fd, &ch, 1, 0) <= 0) {
 			return -1;
 		}
 		*buf++ = ch;
@@ -35,7 +35,9 @@ int readMsg(int fd, Msg* msg) {
 	}
 
 	msg->command = buf[0];
-	msg->length = ntohl((buf[4] << 24) + (buf[3] << 16) + (buf[2] << 8) + buf[1]);
+	msg->length = ntohl((uint8_t(buf[4]) << 24) + (uint8_t(buf[3]) << 16) + (uint8_t(buf[2]) << 8) + uint8_t(buf[1]));
+
+	printf("%d,%d,%d,%d, command %d, length %d\n", uint8_t(buf[4]),uint8_t(buf[3]),uint8_t(buf[2]),uint8_t(buf[1]),msg->command,msg->length);
 
 	if (msg->length <= 0) {
 		return 0;
@@ -59,6 +61,19 @@ int writeAck(int fd, bool ok, std::string error) {
 	json.get<picojson::object>()["err"] = picojson::value(error);
 
 	std::string ret = json.serialize();
+
+	unsigned long size = ntohl(ret.size());
+	uint8_t l1 = (size >> 24) & 0xFF;
+	uint8_t l2 = (size >> 16) & 0xFF;
+	uint8_t l3 = (size >> 8) & 0xFF;
+	uint8_t l4 = (size >> 0) & 0xFF;
+
+	char buf[5] = { ACK ,l4,l3,l2,l1 };
+
+	if (send(fd, buf, 5, 0) < 0) {
+		return -1;
+	}
+
 	return send(fd, ret.c_str(), ret.size(), 0);
 }
 
@@ -103,14 +118,10 @@ int unmarshalAddItemPayload(char* payload, AddItemPayload& items) {
 
 	picojson::array itemValue = val.get<picojson::object>()["items"].get<picojson::array>();
 
-	std::cout << itemValue.size() << std::endl;
-
 	for (int i = 0; i < itemValue.size(); i++)
 	{
 		std::string item = itemValue[i].get<std::string>();
 		items.items.push_back(item);
-
-		std::cout << item << std::endl;
 	}
 
 	return 0;
@@ -124,24 +135,32 @@ int queryDataAck(int fd, OPCDAClient& c) {
 	for (auto iter = itemMap.begin(); iter != itemMap.end(); iter++)
 	{
 		picojson::value retValue;
-		retValue.set<picojson::object>(picojson::object());
-		retValue.get<picojson::object>()["ok"] = picojson::value(iter->second.getValid());
-		retValue.get<picojson::object>()["type"] = picojson::value(double(iter->second.getDataType()));
 
-		if (iter->second.getQuality() != 192) {
-			retValue.get<picojson::object>()["error"] = picojson::value("bad value");
+		retValue.set<picojson::object>(picojson::object());
+		
+		if (!iter->second.getValid()) {
+			retValue.get<picojson::object>()["ok"] = picojson::value(false);
+			retValue.get<picojson::object>()["type"] = picojson::value(double(0));
+			retValue.get<picojson::object>()["error"] = picojson::value("invalid item");
 		}
 		else {
-			retValue.get<picojson::object>()["val"] = picojson::value(OPCDAClient::VariantToString(iter->second.getDataType(), iter->second.getValue()));
+			if (iter->second.getQuality() != 192) {
+				retValue.get<picojson::object>()["ok"] = picojson::value(false);
+				retValue.get<picojson::object>()["type"] = picojson::value(double(0));
+				retValue.get<picojson::object>()["error"] = picojson::value("bad value");
+			}
+			else {
+				retValue.get<picojson::object>()["ok"] = picojson::value(iter->second.getValid());
+				retValue.get<picojson::object>()["type"] = picojson::value(double(iter->second.getDataType()));
+				retValue.get<picojson::object>()["val"] = picojson::value(OPCDAClient::VariantToString(iter->second.getDataType(), iter->second.getValue()));
+			}
 		}
-
 		v.get<picojson::object>()[iter->first] = retValue;
 	}
 
 	std::string s = v.serialize();
 
 	unsigned long size = ntohl(s.size());
-
 	uint8_t l1 = (size >> 24) & 0xFF;
 	uint8_t l2 = (size >> 16) & 0xFF;
 	uint8_t l3 = (size >> 8) & 0xFF;
@@ -154,4 +173,26 @@ int queryDataAck(int fd, OPCDAClient& c) {
 	}
 
 	return send(fd, s.c_str(), s.size(), 0);
+}
+
+int handleWriteDataMsg(Msg& msg, WriteDataPayload& paylod) {
+	if (msg.command != WriteValue) {
+		return -1;
+	}
+
+	return unmarshalWriteDataPayload(msg.payload, paylod);
+}
+
+int unmarshalWriteDataPayload(char* payload, WriteDataPayload& writeValuePayload) {
+	picojson::value val;
+	std::string err = picojson::parse(val, payload);
+	if (!err.empty())
+	{
+		return -1;
+	}
+
+	writeValuePayload.item = val.get<picojson::object>()["item"].get<std::string>();
+	writeValuePayload.value = val.get<picojson::object>()["item"].get<std::string>();
+
+	return 0;
 }

@@ -13,6 +13,7 @@
 #define RefreshMsg    4
 #define ACK           5
 #define QueryAck      6
+#define WriteValue    7
 
 struct Msg {
 	unsigned char command;
@@ -42,7 +43,6 @@ struct MsgAck {
 };
 
 int readMsg(int fd, Msg* msg);
-void releaseMsg(Msg* msg);
 int writeAck(int fd, bool ok, std::string error);
 
 
@@ -63,5 +63,13 @@ int handleAddItemMsg(Msg& msg, AddItemPayload& paylod);
 int unmarshalAddItemPayload(char* payload, AddItemPayload& paylod);
 
 int queryDataAck(int fd, OPCDAClient& c);
+
+struct WriteDataPayload {
+	std::string item;
+	std::string value;
+};
+
+int handleWriteDataMsg(Msg& msg, WriteDataPayload& paylod);
+int unmarshalWriteDataPayload(char* payload, WriteDataPayload& paylod);
 
 #endif

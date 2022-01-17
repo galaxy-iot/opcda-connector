@@ -167,8 +167,6 @@ int OPCDAClient::newGroup(const std::wstring& groupName, bool active, unsigned l
         return -1;
     }
 
-    std::cout << GroupHandle << std::endl;
-
     result = iStateManagement->QueryInterface(IID_IOPCSyncIO, (void**)&iSyncIO);
     if (FAILED(result))
     {
@@ -217,7 +215,6 @@ int OPCDAClient::addItem(std::string itemName,bool active) {
     OPCITEMDEF m_Items[1];
 
     if (this->itemMap.find(itemName) == this->itemMap.end()) {
-        std::cout << itemName << " not exist" << std::endl;
         itemMap.insert(std::pair<std::string, OPCDAItem>(itemName, OPCDAItem(itemName)));
     }
     else {
@@ -346,113 +343,181 @@ void OPCDAClient::printValues() {
 
 std::string OPCDAClient::VariantToString(VARTYPE type,VARIANT data)
 {
-    std::string strValue;
-    TCHAR szValue[1024] = { 0x00 };
-
     switch (type)
     {
     case VT_BSTR:
     case VT_LPSTR:
-    case VT_LPWSTR:
-        strValue = (LPCTSTR)data.bstrVal;
-        break;
-
+    case VT_LPWSTR: {
+        std::string s;
+        int index = 0;
+        while (*(data.bstrVal + index) != 0) {
+            s = s + (char)*(data.bstrVal + index);
+            index++;
+        }
+        return s;
+    }
     case VT_I1:
     case VT_UI1:
-        sprintf_s(szValue, _T("%d"), data.bVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.bVal);
     case VT_I2:
-        sprintf_s(szValue, _T("%d"), data.iVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.iVal);
     case VT_UI2:
-        sprintf_s(szValue, _T("%d"), data.uiVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.uiVal);
     case VT_INT:
-        sprintf_s(szValue, _T("%d"), data.intVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.intVal);
     case VT_I4:
-        sprintf_s(szValue, _T("%d"), data.lVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.lVal);
     case VT_I8:
-        sprintf_s(szValue, _T("%ld"), data.bVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.bVal);
     case VT_UINT:
-        sprintf_s(szValue, _T("%u"), data.uintVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.uintVal);
     case VT_UI4:
-        sprintf_s(szValue, _T("%u"), data.ulVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.ullVal);
     case VT_UI8:
-        sprintf_s(szValue, _T("%u"), data.ulVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.ullVal);
     case VT_VOID:
-        sprintf_s(szValue, _T("%8x"), (unsigned int)data.byref);
-        strValue = szValue;
-        break;
-
+        return std::to_string((uint64_t)data.byref);
     case VT_R4:
-        sprintf_s(szValue, _T("%.4f"), data.fltVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.fltVal);
     case VT_R8:
-        sprintf_s(szValue, _T("%.8f"), data.dblVal);
-        strValue = szValue;
-        break;
-
+        return std::to_string(data.dblVal);
     case VT_DECIMAL:
-        sprintf_s(szValue, _T("%.4f"), data.decVal);
-        strValue = szValue;
-        break;
-
+        return "";
     case VT_CY:
-        //COleCurrency cy = data.vDataValue.cyVal;
-        //strValue = cy.Format();
-        break;
-
+        return "";
     case VT_BOOL:
-        strValue = data.boolVal ? "TRUE" : "FALSE";
-        break;
-
+        return data.boolVal ? "true" : "false";
     case VT_DATE: {
-        DATE dt = data.date;
-        // COleDateTime da = COleDateTime(dt);
-        // strValue = da.Format("%Y-%m-%d %H:%M:%S");
-        break;
+        return "";
     }
-
-
     case VT_NULL:
-        strValue = "VT_NULL";
-        break;
-
+        return  "VT_NULL";
     case VT_EMPTY:
-        strValue = "";
-        break;
-
+        return "";
     case VT_UNKNOWN:
     default:
-        strValue = "UN_KNOWN";
+        return "UN_KNOWN";
+    }
+}
+
+int OPCDAClient::StringToVariant(VARTYPE type, std::string value, VARIANT &va) {
+    switch (type)
+    {
+    case VT_BSTR:
+    case VT_LPSTR:
+    case VT_LPWSTR: {
+        va.vt = type;
+        va.bstrVal = _com_util::ConvertStringToBSTR(value.c_str());;
         break;
     }
+    case VT_I1:
+    case VT_UI1: {
+        va.vt = type;
+        va.bVal = atoi(value.c_str());
+        break;
+    }
+    case VT_I2: {
+        va.vt = type;
+        va.iVal = atoi(value.c_str());
+        break;
+    }
+    case VT_UI2: {
+        va.vt = type;
+        va.uiVal = atoi(value.c_str());
+        break;
+    }
+    case VT_INT: {
+        va.vt = type;
+        va.intVal = atoi(value.c_str());
+        break;
+    }
+    case VT_I4: {
+        va.vt = type;
+        va.lVal = atoi(value.c_str());
+        break;
+    }
+    case VT_I8: {
+        va.vt = type;
+        va.bVal = atol(value.c_str());
+        break;
+    }
+    case VT_UINT: {
+        va.vt = type;
+        va.uintVal = atol(value.c_str());
+        break;
+    }
+    case VT_UI4: {
+        va.vt = type;
+        va.ullVal = atol(value.c_str());
+        break;
+    }
+    case VT_UI8: {
+        va.vt = type;
+        va.ullVal = atol(value.c_str());
+        break;
+    }
+    case VT_VOID:
+        return -1;
+    case VT_R4: {
+        va.vt = type;
+        va.fltVal = atof(value.c_str());
+        break;
+    }
+    case VT_R8: {
+        va.vt = type;
+        va.dblVal = atof(value.c_str());
+        break;
+    }
+    case VT_DECIMAL:
+    case VT_CY:
+    case VT_BOOL: {
+        va.vt = type;
+        va.boolVal = (value == "true");
+        break;
+    }
+    case VT_DATE: {
+        return -1;
+    }
+    case VT_NULL:
+    case VT_EMPTY:
+    case VT_UNKNOWN:
+    default:
+        return -1;
+    }
+    return 0;
+}
 
-    return strValue;
+int OPCDAClient::writeValue(std::string item, std::string value) {
+    if (this->itemMap.find(item) == this->itemMap.end()){
+        return -1;
+    }
+
+    if (!this->itemMap[item].getValid()) {
+        return -1;
+    }
+
+    VARIANT va;
+    if (StringToVariant(this->itemMap[item].getDataType(), value,va) < 0) {
+        return -1;
+    }
+
+    HRESULT* itemWriteErrors;
+    OPCHANDLE serverItemHandler[1] = { itemMap[item].getServerItemHandle() };
+
+    printf("%d\n",this->itemMap[item].getDataType());
+
+    HRESULT result = iSyncIO->Write(1, serverItemHandler, &va, &itemWriteErrors);
+    if (FAILED(result))
+    {
+        return -1;
+    }
+
+    int ret = 0;
+
+    if (FAILED(itemWriteErrors[0]))
+    {
+        ret = 1;
+    } // if
+    //CoTaskMemFree(itemWriteErrors);
+    return ret;
 }

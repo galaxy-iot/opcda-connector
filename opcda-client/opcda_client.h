@@ -15,6 +15,8 @@
 #include <vector>
 #include <iostream>
 #include <unordered_map>
+#include <string>
+#include <comutil.h>
 
 #include "opccomn.h"
 #include "opc_enum.h"
@@ -61,6 +63,9 @@ public:
 
     std::unordered_map<std::string, OPCDAItem>& getDataMap(); 
     static std::string VariantToString(VARTYPE type, VARIANT data);
+    static int OPCDAClient::StringToVariant(VARTYPE type, std::string value, VARIANT& va);
+
+    int writeValue(std::string item,std::string value);
 }; 
 
 #endif

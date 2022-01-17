@@ -32,6 +32,13 @@ int main() {
 	}
 	d.addItem("aaa.aaa1", true);
 	d.addItem("aaa.aaa2", true);
+	d.addItem("aaa.aaaa", true);
+
+	ret = d.writeValue("aaa.aaaa","shiq");
+	if (ret < 0) {
+		std::cout << "write failed" << std::endl;
+		exit(-1);
+	}
 
 	ret = d.enableAsync();
 	if (ret < 0) {
