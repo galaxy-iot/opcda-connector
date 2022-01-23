@@ -12,6 +12,12 @@ OPCDAClient::OPCDAClient() {
 
     CoInitializeSecurity(nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_NONE, RPC_C_IMP_LEVEL_IMPERSONATE, nullptr,
         EOAC_NONE, nullptr);
+
+    result = CoGetMalloc(MEMCTX_TASK, &iMalloc);
+    if (FAILED(result))
+    {
+
+    }
 }
 
 OPCDAClient::~OPCDAClient() {
@@ -26,6 +32,8 @@ OPCDAClient::~OPCDAClient() {
 
     printf("%s\n","dconstruct");
     CoUninitialize();
+
+    iMalloc.Release();
 }
 
 HRESULT makeCOMObjectEx(std::wstring hostName, tagCLSCTX serverLocation, const IID requestedClass,
@@ -63,7 +71,7 @@ HRESULT makeCOMObjectEx(std::wstring hostName, tagCLSCTX serverLocation, const I
 } // COPCHost::makeCOMObjectEx
 
 
-HRESULT getListOfDAServersEx(std::wstring hostName, tagCLSCTX serverLocation, CATID cid,
+HRESULT OPCDAClient::getListOfDAServersEx(std::wstring hostName, tagCLSCTX serverLocation, CATID cid,
     std::vector<std::wstring>& listOfProgIDs, std::vector<CLSID>& listOfClassIDs)
 {
     CATID implist[1] = { cid };
@@ -105,8 +113,8 @@ HRESULT getListOfDAServersEx(std::wstring hostName, tagCLSCTX serverLocation, CA
                 return ret;
             }
 
-            CoTaskMemFree(progID);
-            CoTaskMemFree(userType);
+            comFree(progID);
+            comFree(userType);
         } // else
     }     // while
 
@@ -198,17 +206,17 @@ int OPCDAClient::removeItem(std::string itemName) {
     handlers[0] = itemMap[itemName].getServerItemHandle();
     HRESULT* results = nullptr;
 
+    int ret = 0;
+
     HRESULT result = iItemManagement->RemoveItems(1, handlers,&results);
-    if (FAILED(result)) {
-        return -1;
+    if (FAILED(result) || FAILED(results[0])) {
+        ret = -1;
+        goto exit;
     }
 
-    if (FAILED(results[0])) {
-        return -1;
-    }
-
-    CoTaskMemFree(results);
-    return 0;
+exit:
+    comFree(results);
+    return ret;
 }
 
 int OPCDAClient::addItem(std::string itemName,bool active) {
@@ -218,7 +226,7 @@ int OPCDAClient::addItem(std::string itemName,bool active) {
         itemMap.insert(std::pair<std::string, OPCDAItem>(itemName, OPCDAItem(itemName)));
     }
     else {
-        std::cout << removeItem(itemName) << std::endl;
+        removeItem(itemName);
     }
 
     m_Items[0].szItemID = (wchar_t*)(S2WS(itemName).c_str());
@@ -240,7 +248,7 @@ int OPCDAClient::addItem(std::string itemName,bool active) {
 
     if (details[0].pBlob)
     {
-        CoTaskMemFree(details[0].pBlob);
+        comFree(details[0].pBlob);
     }
 
     if (FAILED(results[0])) {
@@ -252,8 +260,8 @@ int OPCDAClient::addItem(std::string itemName,bool active) {
         this->itemMap[itemName].setServerItemHandle(details[0].hServer);
     }
 
-    CoTaskMemFree(details);
-    CoTaskMemFree(results);
+    comFree(details);
+    comFree(results);
 
     return 0;
 }
@@ -285,8 +293,8 @@ int OPCDAClient::readItem(std::string itemName) {
     itemMap[itemName].setQuality(pItemValue[0].wQuality);
     itemMap[itemName].setValue(pItemValue[0].vDataValue);
 
-    CoTaskMemFree(pItemValue);
-    CoTaskMemFree(pErrors);
+    comFree(pItemValue);
+    comFree(pErrors);
 
     return 0;
 }
@@ -506,18 +514,28 @@ int OPCDAClient::writeValue(std::string item, std::string value) {
 
     printf("%d\n",this->itemMap[item].getDataType());
 
+    int ret = 0;
     HRESULT result = iSyncIO->Write(1, serverItemHandler, &va, &itemWriteErrors);
-    if (FAILED(result))
+    if (FAILED(result) || FAILED(itemWriteErrors[0]))
     {
-        return -1;
+        ret = -1;
+        goto exit;
     }
 
-    int ret = 0;
-
-    if (FAILED(itemWriteErrors[0]))
-    {
-        ret = 1;
-    } // if
-    //CoTaskMemFree(itemWriteErrors);
+ exit:  
+    comFree(itemWriteErrors);
     return ret;
 }
+
+void OPCDAClient::comFree(void* memory)
+{
+    iMalloc->Free(memory);
+} // COPCClient::comFree
+
+void OPCDAClient::comFreeVariant(VARIANT* memory, unsigned size)
+{
+    for (unsigned i = 0; i < size; ++i)
+        VariantClear(&(memory[i]));
+
+    iMalloc->Free(memory);
+} // COPCClient::comFreeVariant

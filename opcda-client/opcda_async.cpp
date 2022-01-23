@@ -1,6 +1,6 @@
 #include "opcda_async.h"
 
-CAsyncDataCallback::CAsyncDataCallback() : ReferenceCount(0) {}
+CAsyncDataCallback::CAsyncDataCallback() {};
 
 STDMETHODIMP CAsyncDataCallback::QueryInterface(REFIID iid, LPVOID* ppInterface)
 {
@@ -55,6 +55,7 @@ STDMETHODIMP CAsyncDataCallback::OnDataChange(DWORD transactionID, OPCHANDLE gro
         
         item->setQuality(quality[i]);
         item->setValue(values[i]);
+        VariantClear(&(values[i]));
     }
 
     return S_OK;
@@ -64,7 +65,9 @@ STDMETHODIMP CAsyncDataCallback::OnReadComplete(DWORD transactionID, OPCHANDLE g
     DWORD count, OPCHANDLE* clientHandles, VARIANT* values, WORD* quality, FILETIME* time,
     HRESULT* errors)
 {
-    std::cout << "on read complete" << std::endl;
+    for (int i = 0; i < count; i++) {
+        VariantClear(&(values[i]));
+    }
     return S_OK;
 } // OnReadComplete
 

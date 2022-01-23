@@ -2,11 +2,20 @@
 #include <windows.h>
 
 #include "opcda_client.h"
+#include "encoding.h"
 
 int main() {
+	std::string ret1;
+	std::string newItemName = "BZZ-CKCW-SD";
+	for (int i = 0; i < newItemName.size(); i++) {
+		ret1 += "\\x" + std::to_string(newItemName[i]);
+	}
+
+	std::cout << ret1 << std::endl;
+
 	OPCDAClient d;
 
-	int ret = d.connectToServer(L"Matrikon.OPC.Simulation.1",L"192.168.123.197");
+	int ret = d.connectToServer(L"OPCServer.WinCC.1",L"10.30.2.13");
 	if (ret < 0) {
 		std::cout << "connect to server failed" << std::endl;
 		exit(-1);
@@ -25,15 +34,20 @@ int main() {
 	std::cout << "create group successfully" << std::endl;
 
 
-	ret = d.addItem("aaa.aaa", true);
+	ret = d.addItem("B料位计B下限_1", true);
 	if (ret < 0) {
 		std::cout << "add items failed" << std::endl;
 		exit(-1);
 	}
-	d.addItem("aaa.aaa1", true);
-	d.addItem("aaa.aaa2", true);
-	d.addItem("aaa.aaaa", true);
 
+	ret = d.readItem("B料位计B下限_1");
+	if (ret < 0) {
+		std::cout << "read items failed" << std::endl;
+		exit(-1);
+	}
+
+	d.printValues();
+	/*
 	ret = d.writeValue("aaa.aaaa","shiq");
 	if (ret < 0) {
 		std::cout << "write failed" << std::endl;
@@ -53,6 +67,6 @@ int main() {
 		Sleep(1000);
 		d.printValues();
 	}
-
+	*/
 	return 0;
 }

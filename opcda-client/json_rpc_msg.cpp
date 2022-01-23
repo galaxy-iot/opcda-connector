@@ -37,7 +37,7 @@ int readMsg(int fd, Msg* msg) {
 	msg->command = buf[0];
 	msg->length = ntohl((uint8_t(buf[4]) << 24) + (uint8_t(buf[3]) << 16) + (uint8_t(buf[2]) << 8) + uint8_t(buf[1]));
 
-	printf("%d,%d,%d,%d, command %d, length %d\n", uint8_t(buf[4]),uint8_t(buf[3]),uint8_t(buf[2]),uint8_t(buf[1]),msg->command,msg->length);
+	//printf("%d,%d,%d,%d, command %d, length %d\n", uint8_t(buf[4]),uint8_t(buf[3]),uint8_t(buf[2]),uint8_t(buf[1]),msg->command,msg->length);
 
 	if (msg->length <= 0) {
 		return 0;
@@ -195,4 +195,14 @@ int unmarshalWriteDataPayload(char* payload, WriteDataPayload& writeValuePayload
 	writeValuePayload.value = val.get<picojson::object>()["item"].get<std::string>();
 
 	return 0;
+}
+
+void refreshInvalidItem(OPCDAClient& c) {
+	auto itemMap = c.getDataMap();
+	for (auto iter = itemMap.begin(); iter != itemMap.end(); iter++)
+	{
+		if (!iter->second.getValid()) {
+			c.addItem(iter->first, true);
+		}
+	}
 }

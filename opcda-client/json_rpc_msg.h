@@ -72,4 +72,5 @@ struct WriteDataPayload {
 int handleWriteDataMsg(Msg& msg, WriteDataPayload& paylod);
 int unmarshalWriteDataPayload(char* payload, WriteDataPayload& paylod);
 
+void refreshInvalidItem(OPCDAClient& c);
 #endif

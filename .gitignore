@@ -2,6 +2,7 @@
 build
 out
 *.exe
+enc_temp_folder
 
 # Prerequisites
 *.d

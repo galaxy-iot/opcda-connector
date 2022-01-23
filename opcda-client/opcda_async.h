@@ -13,6 +13,7 @@ class CAsyncDataCallback : public IOPCDataCallback
 {
 private:
     DWORD ReferenceCount;
+
 public:
     CAsyncDataCallback();
     virtual ~CAsyncDataCallback() {};

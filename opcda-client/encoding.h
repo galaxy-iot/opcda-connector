@@ -3,8 +3,7 @@
 
 #include <codecvt>
 
-std::string WS2S(const std::wstring& wstr);
-
-std::wstring S2WS(const std::string& str);
+std::string WS2S(const std::wstring wstr);
+std::wstring S2WS(const std::string str);
 
 #endif
